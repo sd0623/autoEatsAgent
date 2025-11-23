@@ -1,0 +1,61 @@
+restaurant_id,name,cuisine_type,city,zip_code,avg_rating,delivery_eta,price_min,price_max
+R1,Reed-Anderson Thai,Thai,New York City,10023,3.9,36,15,20
+R2,Steele-Powell Italian,Italian,New York City,10003,4.7,15,15,20
+R3,Pacheco-Garcia Mexican,Mexican,New York City,10008,4.4,36,10,15
+R4,Winters-Estes American,American/Burger,New York City,10019,3.7,39,15,20
+R5,"Schultz, Ramos and Smith Indian",Indian,New York City,10009,4.5,18,15,20
+R6,"Clark, Fields and Chavez Chinese",Chinese,New York City,10004,3.7,15,15,20
+R7,"Morrison, Moore and Parker Japanese",Japanese/Sushi,New York City,10001,4.6,10,20,50
+R8,Wilson-Vega Mediterranean,Mediterranean,New York City,10019,3.7,34,20,50
+R9,Mclaughlin PLC Vietnamese,Vietnamese,New York City,10025,4.4,28,15,20
+R10,Brady-Baldwin Vegan,Vegan/Healthy,New York City,10019,4.4,21,20,50
+R11,Garcia-Fields Thai,Thai,New York City,10023,4.4,15,20,50
+R12,Lopez-Acosta Italian,Italian,New York City,10011,3.6,27,15,20
+R13,Bowers-Conway Mexican,Mexican,New York City,10009,3.6,12,15,20
+R14,Gonzalez-Gross American,American/Burger,New York City,10001,3.8,10,15,20
+R15,"Francis, Johnson and Avery Indian",Indian,New York City,10005,3.6,15,15,20
+R16,Hudson Ltd Chinese,Chinese,New York City,10006,3.8,28,10,15
+R17,"Johnson, Vaughan and Mendoza Japanese",Japanese/Sushi,New York City,10005,4.4,31,20,50
+R18,"Gonzalez, Lee and Carney Mediterranean",Mediterranean,New York City,10023,3.8,12,20,50
+R19,"Parrish, Wright and Wilson Vietnamese",Vietnamese,New York City,10004,4.5,31,15,20
+R20,Bell LLC Vegan,Vegan/Healthy,New York City,10005,4,38,15,20
+R21,Bishop Group Thai,Thai,Los Angeles,90004,3.9,33,20,50
+R22,Owens-Jenkins Italian,Italian,Los Angeles,90028,4,16,20,50
+R23,"Kline, Gomez and Case Mexican",Mexican,Los Angeles,90012,3.9,38,15,20
+R24,Novak-Pitts American,American/Burger,Los Angeles,90038,3.8,21,15,20
+R25,Ellis Ltd Indian,Indian,Los Angeles,90026,3.7,37,20,50
+R26,Smith LLC Chinese,Chinese,Los Angeles,90039,3.9,38,15,20
+R27,Martin-Bolton Japanese,Japanese/Sushi,Los Angeles,90032,3.7,15,20,50
+R28,Drake-Baker Mediterranean,Mediterranean,Los Angeles,90002,4.5,19,20,50
+R29,"Pitts, Hutchinson and Smith Vietnamese",Vietnamese,Los Angeles,90021,3.4,29,15,20
+R30,Morris Ltd Vegan,Vegan/Healthy,Los Angeles,90037,3.8,38,20,50
+R31,Munoz Ltd Thai,Thai,Los Angeles,90039,3.8,24,20,50
+R32,Hill-Lee Italian,Italian,Los Angeles,90031,3.8,24,15,20
+R33,"Jones, Barrett and Ford Mexican",Mexican,Los Angeles,90003,4.6,10,10,15
+R34,"Smith, Sanders and Mitchell American",American/Burger,Los Angeles,90002,3.8,31,15,20
+R35,Gonzales PLC Indian,Indian,Los Angeles,90044,3.9,35,15,20
+R36,King-Walker Chinese,Chinese,Los Angeles,90006,3.7,38,15,20
+R37,Larsen-Hicks Japanese,Japanese/Sushi,Los Angeles,90013,4.4,22,20,50
+R38,Fowler-Norton Mediterranean,Mediterranean,Los Angeles,90035,3.9,13,15,20
+R39,Bush Inc Vietnamese,Vietnamese,Los Angeles,90004,3.3,29,15,20
+R40,"Cohen, Rodriguez and Warren Vegan",Vegan/Healthy,Los Angeles,90017,4.5,35,15,20
+R41,"Walker, Ramirez and Jones Thai",Thai,Chicago,60612,3.8,21,15,20
+R42,"Clark, Johnson and Luna Italian",Italian,Chicago,60629,3.9,35,15,20
+R43,Wells-Dyer Mexican,Mexican,Chicago,60604,4.4,25,15,20
+R44,Chase Group American,American/Burger,Chicago,60606,3.7,22,15,20
+R45,Stephens and Sons Indian,Indian,Chicago,60625,4,13,20,50
+R46,Oliver-Tate Chinese,Chinese,Chicago,60625,3.8,35,10,15
+R47,Fernandez Group Japanese,Japanese/Sushi,Chicago,60640,4.5,13,20,50
+R48,Edwards-Green Mediterranean,Mediterranean,Chicago,60638,4.5,17,20,50
+R49,Beasley Ltd Vietnamese,Vietnamese,Chicago,60608,3.8,16,15,20
+R50,Li Inc Vegan,Vegan/Healthy,Chicago,60624,3.9,13,20,50
+R51,Burns-Washington Thai,Thai,Chicago,60640,3.8,39,20,50
+R52,"Ballard, Freeman and Smith Italian",Italian,Chicago,60604,3.7,16,20,50
+R53,Kelley-Miller Mexican,Mexican,Chicago,60631,4.6,27,15,20
+R54,"Munoz, Lutz and Myers American",American/Burger,Chicago,60601,3.8,27,10,15
+R55,Mcpherson-Ray Indian,Indian,Chicago,60636,3.8,34,20,50
+R56,Mills-Moran Chinese,Chinese,Chicago,60636,3.4,23,10,15
+R57,Bell PLC Japanese,Japanese/Sushi,Chicago,60613,4.6,10,20,50
+R58,"Oliver, Robbins and Sparks Mediterranean",Mediterranean,Chicago,60604,3.8,22,20,50
+R59,Taylor-Moody Vietnamese,Vietnamese,Chicago,60634,3.6,11,10,15
+R60,Carroll PLC Vegan,Vegan/Healthy,Chicago,60612,3.8,17,15,20
