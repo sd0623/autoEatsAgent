@@ -1,4 +1,4 @@
-# AutoMeal Agent MCP Server
+# AutoEats Agent MCP Server
 
 A FastAPI-based Model Context Protocol (MCP) server for online food ordering automation with simulated API calls and dummy data.
 
