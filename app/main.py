@@ -15,7 +15,7 @@ from app.dummy_data import (
 )
 
 app = FastAPI(
-    title="AutoMeal Agent MCP Server",
+    title="AutoEats Agent MCP Server",
     description="MCP server for online food ordering automation with simulated API calls",
     version="1.0.0"
 )
@@ -34,7 +34,7 @@ app.add_middleware(
 @app.get("/")
 async def root():
     return {
-        "name": "AutoMeal Agent MCP Server",
+        "name": "AutoEats Agent MCP Server",
         "version": "1.0.0",
         "description": "MCP server for online food ordering automation"
     }
@@ -51,7 +51,7 @@ async def get_manifest():
     can do, what protocol version it uses, and provides general information.
     """
     return MCPManifest(
-        name="AutoMeal Agent MCP Server",
+    name="AutoEats Agent MCP Server",
         version="1.0.0",
         description="MCP server for online food ordering automation with simulated API calls",
         protocol_version="2024-11-05",
@@ -65,7 +65,7 @@ async def get_manifest():
             }
         },
         server_info={
-            "vendor": "AutoMeal Agent",
+            "vendor": "AutoEats Agent",
             "product": "Food Ordering MCP Server",
             "features": [
                 "dish_search",
@@ -79,7 +79,7 @@ async def get_manifest():
 
 @app.get("/mcp/tools", response_model=List[MCPTool])
 async def list_tools():
-    """List all available MCP tools for the AutoMeal agent"""
+    """List all available MCP tools for the AutoEats agent"""
     return [
         MCPTool(
             name="search_dishes",
@@ -508,7 +508,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "service": "AutoMeal Agent MCP Server",
+        "service": "AutoEats Agent MCP Server",
         "dishes_count": len(get_all_dishes()),
         "restaurants_count": len(get_all_restaurants())
     }

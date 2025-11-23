@@ -249,7 +249,7 @@ def create_order(items: List[dict], user_id: str = None, delivery_address: str =
         order_id=order_id,
         status=DeliveryStatus.PENDING,
         estimated_arrival=estimated_delivery.isoformat(),
-        tracking_url=f"https://track.automeal.com/{order_id}"
+    tracking_url=f"https://track.autoeats.com/{order_id}"
     )
     DELIVERIES[order_id] = delivery
     
