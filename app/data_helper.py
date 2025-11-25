@@ -1,4 +1,4 @@
-from app.models import Dish, Restaurant, MenuItem, Order, OrderItem, OrderStatus, DeliveryInfo, DeliveryStatus
+from app.models import Dish, Restaurant, Order, OrderItem, OrderStatus, DeliveryInfo, DeliveryStatus
 from datetime import datetime, timedelta
 from typing import List, Dict
 import random
@@ -6,7 +6,7 @@ import string
 import csv
 from pathlib import Path
 
-# ---- In-memory stores (POC) ----
+# ---- In-memory storage (POC) ----
 
 # Get the data directory path
 BASE_DIR = Path(__file__).parent.parent
@@ -14,7 +14,7 @@ DATA_DIR = BASE_DIR / "data"
 DISHES_CSV = DATA_DIR / "dishes.csv"
 RESTAURANTS_CSV = DATA_DIR / "restaurants.csv"
 
-
+# Load restaurants from CSV
 def load_restaurants() -> Dict[str, Restaurant]:
     """Load restaurants from restaurants.csv"""
     restaurants = {}
@@ -39,7 +39,7 @@ def load_restaurants() -> Dict[str, Restaurant]:
     
     return restaurants
 
-
+# Load dishes from CSV
 def load_dishes_from_csv() -> List[Dish]:
     """Load dishes from dishes.csv file - using CSV fields directly"""
     dishes = []
@@ -68,31 +68,10 @@ def load_dishes_from_csv() -> List[Dish]:
     return dishes
 
 
-def build_menus_from_dishes(dishes: List[Dish]) -> Dict[str, List[Dict]]:
-    """Build MENUS dictionary from dishes data"""
-    menus: Dict[str, List[Dict]] = {}
-    
-    for dish in dishes:
-        restaurant_id = dish.restaurant_id
-        
-        if restaurant_id not in menus:
-            menus[restaurant_id] = []
-        
-        menu_item = {
-            "item_id": dish.dish_id,
-            "name": dish.dish_name,
-            "price": dish.price,
-            "available": True  # All dishes are available by default
-        }
-        menus[restaurant_id].append(menu_item)
-    
-    return menus
-
 
 # Load data from CSV files
 RESTAURANTS = load_restaurants()
 DISHES = load_dishes_from_csv()
-MENUS = build_menus_from_dishes(DISHES)
 
 # In-memory order storage
 ORDERS: dict = {}
@@ -101,6 +80,9 @@ ORDERS: dict = {}
 DELIVERIES: dict = {}
 
 
+# ---- Data access and helper functions ----
+
+# --- Dish related functions ----
 def get_all_dishes():
     """Get all available dishes"""
     return DISHES.copy()
@@ -142,34 +124,31 @@ def search_dishes(
     
     return results
 
-
-def get_restaurant_menu(restaurant_id: str):
-    """Get menu for a specific restaurant"""
-    if restaurant_id not in MENUS:
-        return None
-    
-    items = [MenuItem(**item) for item in MENUS[restaurant_id]]
-    return items
-
+# --- Restaurant related functions ----
+def get_restaurant_by_id(restaurant_id: str):
+    """Get restaurant details by ID"""
+    return RESTAURANTS.get(restaurant_id)
 
 def get_all_restaurants():
     """Get all unique restaurants from restaurants.csv"""
     restaurants = []
     
     for rid, restaurant in RESTAURANTS.items():
+        # Count dishes directly from DISHES
+        dish_count = sum(1 for d in DISHES if d.restaurant_id == rid)
         restaurants.append({
             "restaurant_id": rid,
             "restaurant_name": restaurant.name,
             "cuisine_type": restaurant.cuisine_type,
             "city": restaurant.city,
             "avg_rating": restaurant.avg_rating,
-            "dish_count": len(MENUS.get(rid, []))
+            "dish_count": dish_count
         })
     
     return restaurants
 
-
-def create_order(items: List[dict], user_id: str = None, delivery_address: str = None):
+# --- Order and Delivery related functions ----
+def create_order(items: List[dict], user_id: str = None, delivery_zip: str = None):
     """Create a new order"""
     if not items:
         raise ValueError("Order must contain at least one item")
@@ -190,15 +169,9 @@ def create_order(items: List[dict], user_id: str = None, delivery_address: str =
         dish = get_dish_by_id(dish_id)
         if not dish:
             raise ValueError(f"Dish {dish_id} not found")
-        
-        # Check availability in menu
-        menu = MENUS.get(dish.restaurant_id, [])
-        menu_item = next((m for m in menu if m["item_id"] == dish_id), None)
-        if not menu_item or not menu_item["available"]:
-            raise ValueError(f"Dish {dish_id} is not available")
-        
+
         # Get restaurant info
-        restaurant = RESTAURANTS.get(dish.restaurant_id)
+        restaurant = get_restaurant_by_id(dish.restaurant_id)
         if not restaurant:
             raise ValueError(f"Restaurant {dish.restaurant_id} not found")
         
@@ -238,7 +211,7 @@ def create_order(items: List[dict], user_id: str = None, delivery_address: str =
         status=OrderStatus.PENDING,
         created_at=datetime.now().isoformat(),
         estimated_delivery_time=estimated_delivery.isoformat(),
-        delivery_address=delivery_address
+        delivery_zip=delivery_zip
     )
     
     ORDERS[order_id] = order
@@ -248,8 +221,7 @@ def create_order(items: List[dict], user_id: str = None, delivery_address: str =
         delivery_id=f"del_{order_id}",
         order_id=order_id,
         status=DeliveryStatus.PENDING,
-        estimated_arrival=estimated_delivery.isoformat(),
-    tracking_url=f"https://track.autoeats.com/{order_id}"
+        estimated_arrival=estimated_delivery.isoformat()
     )
     DELIVERIES[order_id] = delivery
     
@@ -277,20 +249,14 @@ def update_order_status(order_id: str, status: OrderStatus):
     # Update delivery status based on order status
     if order_id in DELIVERIES:
         delivery = DELIVERIES[order_id]
-        if status == OrderStatus.CONFIRMED:
-            delivery.status = DeliveryStatus.ASSIGNED
-            delivery.driver_name = f"Driver {random.randint(100, 999)}"
-            delivery.driver_phone = f"+1-555-{random.randint(1000, 9999)}"
-        elif status == OrderStatus.PREPARING:
+        if status == OrderStatus.CONFIRMED or status == OrderStatus.PREPARING:
             delivery.status = DeliveryStatus.ASSIGNED
         elif status == OrderStatus.READY:
             delivery.status = DeliveryStatus.PICKED_UP
         elif status == OrderStatus.OUT_FOR_DELIVERY:
             delivery.status = DeliveryStatus.IN_TRANSIT
-            delivery.current_location = "En route to delivery address"
         elif status == OrderStatus.DELIVERED:
             delivery.status = DeliveryStatus.DELIVERED
-            delivery.current_location = "Delivered"
     
     return order
 

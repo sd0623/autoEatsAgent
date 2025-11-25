@@ -1,16 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 import json
 from datetime import datetime
 
 from app.models import (
-    Dish, MenuItem, Order, OrderRequest, OrderStatus,
-    DeliveryInfo, DishSearchRequest, MCPTool, MCPResource, MCPManifest
+    Dish, Order, OrderRequest, OrderStatus,
+    DeliveryInfo, DishSearchRequest, MCPManifest
 )
-from app.dummy_data import (
+from app.data_helper import (
     get_all_dishes, get_dish_by_id, search_dishes,
-    get_restaurant_menu, get_all_restaurants,
+    get_restaurant_by_id, get_all_restaurants,
     create_order, get_order, get_delivery_info, update_order_status
 )
 
@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 
-# Root endpoint
+# --- Root endpoint ---
 @app.get("/")
 async def root():
     return {
@@ -40,476 +40,320 @@ async def root():
     }
 
 
-# ==================== MCP Server Endpoints ====================
-
-@app.get("/mcp/manifest", response_model=MCPManifest)
-async def get_manifest():
-    """
-    Get the MCP server manifest - describes server capabilities and metadata.
-    
-    The manifest is the server's "business card" - it tells clients what the server
-    can do, what protocol version it uses, and provides general information.
-    """
-    return MCPManifest(
-    name="AutoEats Agent MCP Server",
-        version="1.0.0",
-        description="MCP server for online food ordering automation with simulated API calls",
-        protocol_version="2024-11-05",
-        capabilities={
-            "tools": {
-                "listChanged": False  # Tools list doesn't change dynamically
-            },
-            "resources": {
-                "subscribe": False,
-                "listChanged": False
-            }
-        },
-        server_info={
-            "vendor": "AutoEats Agent",
-            "product": "Food Ordering MCP Server",
-            "features": [
-                "dish_search",
-                "restaurant_menus",
-                "order_placement",
-                "delivery_tracking"
-            ]
-        }
-    )
+# --- Dish endpoints ---
+@app.get("/dishes")
+async def list_dishes():
+    dishes = get_all_dishes()
+    return [d.model_dump() for d in dishes]
 
 
-@app.get("/mcp/tools", response_model=List[MCPTool])
-async def list_tools():
-    """List all available MCP tools for the AutoEats agent"""
-    return [
-        MCPTool(
-            name="search_dishes",
-            description="Search for dishes by name, restaurant, tags, price, or popularity score",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "dish_name": {"type": "string", "description": "Search dish_name for dish name"},
-                    "restaurant_id": {"type": "string", "description": "Filter by restaurant ID"},
-                    "tags": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Filter by tags (e.g., vegan, spicy, vegetarian)"
-                    },
-                    "max_price": {"type": "number", "description": "Maximum price in dollars (e.g., 15.99)"},
-                    "min_popularity_score": {"type": "number", "description": "Minimum popularity score (0-1)"}
-                }
-            }
-        ),
-        MCPTool(
-            name="get_dish",
-            description="Get detailed information about a specific dish by ID",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "dish_id": {"type": "string", "description": "The ID of the dish to retrieve"}
-                },
-                "required": ["dish_id"]
-            }
-        ),
-        MCPTool(
-            name="get_restaurant_menu",
-            description="Get the menu for a specific restaurant",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "restaurant_id": {"type": "string", "description": "The restaurant ID"}
-                },
-                "required": ["restaurant_id"]
-            }
-        ),
-        MCPTool(
-            name="list_restaurants",
-            description="List all available restaurants",
-            inputSchema={
-                "type": "object",
-                "properties": {}
-            }
-        ),
-        MCPTool(
-            name="place_order",
-            description="Place a food order with specified dishes and quantities",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "items": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "dish_id": {"type": "string"},
-                                "quantity": {"type": "integer", "default": 1}
-                            },
-                            "required": ["dish_id"]
-                        },
-                        "description": "List of items to order"
-                    },
-                    "user_id": {"type": "string", "description": "Optional user ID"},
-                    "delivery_address": {"type": "string", "description": "Delivery address"}
-                },
-                "required": ["items"]
-            }
-        ),
-        MCPTool(
-            name="get_order_status",
-            description="Get the current status of an order",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "order_id": {"type": "string", "description": "The order ID"}
-                },
-                "required": ["order_id"]
-            }
-        ),
-        MCPTool(
-            name="get_delivery_info",
-            description="Get delivery tracking information for an order",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "order_id": {"type": "string", "description": "The order ID"}
-                },
-                "required": ["order_id"]
-            }
-        ),
-        MCPTool(
-            name="list_all_dishes",
-            description="List all available dishes from all restaurants",
-            inputSchema={
-                "type": "object",
-                "properties": {}
-            }
-        )
-    ]
-
-
-@app.post("/mcp/tools/call")
-async def call_tool(tool_name: str, arguments: dict):
-    """Execute an MCP tool with the provided arguments"""
-    try:
-        if tool_name == "search_dishes":
-            dish_name = arguments.get("dish_name")
-            restaurant_id = arguments.get("restaurant_id")
-            tags = arguments.get("tags")
-            max_price = arguments.get("max_price")
-            min_popularity_score = arguments.get("min_popularity_score")
-            
-            results = search_dishes(
-                dish_name=dish_name,
-                restaurant_id=restaurant_id,
-                tags=tags,
-                max_price=max_price,
-                min_popularity_score=min_popularity_score
-            )
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps([r.model_dump() for r in results], indent=2)}
-                ]
-            }
-        
-        elif tool_name == "get_dish":
-            dish_id = arguments.get("dish_id")
-            if not dish_id:
-                raise HTTPException(status_code=400, detail="dish_id is required")
-            
-            dish = get_dish_by_id(dish_id)
-            if not dish:
-                raise HTTPException(status_code=404, detail=f"Dish {dish_id} not found")
-            
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(dish.model_dump(), indent=2)}
-                ]
-            }
-        
-        elif tool_name == "get_restaurant_menu":
-            restaurant_id = arguments.get("restaurant_id")
-            if not restaurant_id:
-                raise HTTPException(status_code=400, detail="restaurant_id is required")
-            
-            menu = get_restaurant_menu(restaurant_id)
-            if menu is None:
-                raise HTTPException(status_code=404, detail=f"Restaurant {restaurant_id} not found")
-            
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps([item.model_dump() for item in menu], indent=2)}
-                ]
-            }
-        
-        elif tool_name == "list_restaurants":
-            restaurants = get_all_restaurants()
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(restaurants, indent=2)}
-                ]
-            }
-        
-        elif tool_name == "place_order":
-            items = arguments.get("items")
-            user_id = arguments.get("user_id")
-            delivery_address = arguments.get("delivery_address")
-            
-            if not items:
-                raise HTTPException(status_code=400, detail="items are required")
-            
-            order, delivery = create_order(
-                items=items,
-                user_id=user_id,
-                delivery_address=delivery_address
-            )
-            
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps({
-                            "order": order.model_dump(),
-                            "delivery": delivery.model_dump()
-                        }, indent=2)
-                    }
-                ]
-            }
-        
-        elif tool_name == "get_order_status":
-            order_id = arguments.get("order_id")
-            if not order_id:
-                raise HTTPException(status_code=400, detail="order_id is required")
-            
-            order = get_order(order_id)
-            if not order:
-                raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
-            
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(order.model_dump(), indent=2)}
-                ]
-            }
-        
-        elif tool_name == "get_delivery_info":
-            order_id = arguments.get("order_id")
-            if not order_id:
-                raise HTTPException(status_code=400, detail="order_id is required")
-            
-            delivery = get_delivery_info(order_id)
-            if not delivery:
-                raise HTTPException(status_code=404, detail=f"Delivery info for order {order_id} not found")
-            
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(delivery.model_dump(), indent=2)}
-                ]
-            }
-        
-        elif tool_name == "list_all_dishes":
-            dishes = get_all_dishes()
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps([d.model_dump() for d in dishes], indent=2)}
-                ]
-            }
-        
-        else:
-            raise HTTPException(status_code=404, detail=f"Tool {tool_name} not found")
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/mcp/resources", response_model=List[MCPResource])
-async def list_resources():
-    """List all available MCP resources"""
-    return [
-        MCPResource(
-            uri="dishes://all",
-            name="All Dishes",
-            description="Complete list of all available dishes from all restaurants",
-            mimeType="application/json"
-        ),
-        MCPResource(
-            uri="restaurants://all",
-            name="All Restaurants",
-            description="List of all available restaurants",
-            mimeType="application/json"
-        ),
-        MCPResource(
-            uri="restaurants://{restaurant_id}/menu",
-            name="Restaurant Menu",
-            description="Menu for a specific restaurant",
-            mimeType="application/json"
-        ),
-        MCPResource(
-            uri="dishes://by-tag/{tag}",
-            name="Dishes by Tag",
-            description="Dishes filtered by tag (vegan, spicy, vegetarian, etc.)",
-            mimeType="application/json"
-        )
-    ]
-
-
-@app.get("/mcp/resources/read")
-async def read_resource(uri: str):
-    """Read a specific MCP resource"""
-    try:
-        if uri == "dishes://all":
-            dishes = get_all_dishes()
-            return {
-                "contents": [
-                    {
-                        "uri": uri,
-                        "mimeType": "application/json",
-                        "text": json.dumps([d.model_dump() for d in dishes], indent=2)
-                    }
-                ]
-            }
-        elif uri == "restaurants://all":
-            restaurants = get_all_restaurants()
-            return {
-                "contents": [
-                    {
-                        "uri": uri,
-                        "mimeType": "application/json",
-                        "text": json.dumps(restaurants, indent=2)
-                    }
-                ]
-            }
-        elif uri.startswith("restaurants://") and uri.endswith("/menu"):
-            restaurant_id = uri.split("/")[-2]
-            menu = get_restaurant_menu(restaurant_id)
-            if menu is None:
-                raise HTTPException(status_code=404, detail=f"Restaurant {restaurant_id} not found")
-            return {
-                "contents": [
-                    {
-                        "uri": uri,
-                        "mimeType": "application/json",
-                        "text": json.dumps([item.model_dump() for item in menu], indent=2)
-                    }
-                ]
-            }
-        elif uri.startswith("dishes://by-tag/"):
-            tag = uri.split("/")[-1]
-            dishes = search_dishes(tags=[tag])
-            return {
-                "contents": [
-                    {
-                        "uri": uri,
-                        "mimeType": "application/json",
-                        "text": json.dumps([d.model_dump() for d in dishes], indent=2)
-                    }
-                ]
-            }
-        else:
-            raise HTTPException(status_code=404, detail=f"Resource {uri} not found")
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ==================== Regular API Endpoints ====================
-
-@app.get("/api/dishes", response_model=List[Dish])
-async def get_dishes():
-    """Get all available dishes"""
-    return get_all_dishes()
-
-
-@app.get("/api/dishes/{dish_id}", response_model=Dish)
+@app.get("/dishes/{dish_id}")
 async def get_dish(dish_id: str):
-    """Get a specific dish by ID"""
     dish = get_dish_by_id(dish_id)
     if not dish:
-        raise HTTPException(status_code=404, detail=f"Dish {dish_id} not found")
-    return dish
+        raise HTTPException(status_code=404, detail="Dish not found")
+    return dish.model_dump()
 
 
-@app.post("/api/dishes/search", response_model=List[Dish])
-async def search_dishes_endpoint(request: DishSearchRequest):
-    """Search dishes based on criteria"""
-    return search_dishes(
-        dish_name=request.dish_name,
-        restaurant_id=request.restaurant_id,
-        tags=request.tags,
-        max_price=request.max_price,
-        min_popularity_score=request.min_popularity_score
+@app.post("/dishes/search")
+async def post_search_dishes(req: DishSearchRequest):
+    results = search_dishes(
+        dish_name=req.dish_name,
+        restaurant_id=req.restaurant_id,
+        tags=req.tags,
+        max_price=req.max_price,
+        min_popularity_score=req.min_popularity_score
     )
+    return [d.model_dump() for d in results]
 
 
-@app.get("/api/restaurants", response_model=List[dict])
-async def get_restaurants():
-    """Get all restaurants"""
+# --- Restaurant endpoints ---
+@app.get("/restaurants")
+async def list_restaurants():
     return get_all_restaurants()
 
 
-@app.get("/api/restaurants/{restaurant_id}/menu", response_model=List[MenuItem])
-async def get_menu(restaurant_id: str):
-    """Get menu for a specific restaurant"""
-    menu = get_restaurant_menu(restaurant_id)
-    if menu is None:
-        raise HTTPException(status_code=404, detail=f"Restaurant {restaurant_id} not found")
-    return menu
+@app.get("/restaurants/{restaurant_id}")
+async def get_restaurant(restaurant_id: str):
+    r = get_restaurant_by_id(restaurant_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    return r.model_dump()
 
 
-@app.post("/api/orders", response_model=dict)
-async def create_order_endpoint(request: OrderRequest):
-    """Create a new order"""
+# --- Orders & Delivery endpoints ---
+@app.post("/orders")
+async def post_create_order(req: OrderRequest):
     try:
-        order, delivery = create_order(
-            items=request.items,
-            user_id=request.user_id,
-            delivery_address=request.delivery_address
-        )
-        return {
-            "order": order.model_dump(),
-            "delivery": delivery.model_dump()
-        }
+        order, delivery = create_order(req.items, user_id=req.user_id, delivery_zip=req.delivery_zip)
+        return {"order": order.model_dump(), "delivery": delivery.model_dump()}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.get("/api/orders/{order_id}", response_model=Order)
+@app.get("/orders/{order_id}")
 async def get_order_endpoint(order_id: str):
-    """Get order by ID"""
     order = get_order(order_id)
     if not order:
-        raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
-    return order
+        raise HTTPException(status_code=404, detail="Order not found")
+    return order.model_dump()
 
 
-@app.get("/api/orders/{order_id}/delivery", response_model=DeliveryInfo)
-async def get_delivery_endpoint(order_id: str):
-    """Get delivery information for an order"""
-    delivery = get_delivery_info(order_id)
-    if not delivery:
-        raise HTTPException(status_code=404, detail=f"Delivery info for order {order_id} not found")
-    return delivery
+@app.get("/deliveries/{order_id}")
+async def get_delivery(order_id: str):
+    d = get_delivery_info(order_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="Delivery info not found")
+    return d.model_dump()
 
 
-@app.patch("/api/orders/{order_id}/status")
-async def update_order_status_endpoint(order_id: str, status: OrderStatus):
-    """Update order status (for simulation/testing)"""
+@app.patch("/orders/{order_id}/status")
+async def patch_order_status(order_id: str, status: OrderStatus):
     try:
         order = update_order_status(order_id, status)
         return order.model_dump()
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "service": "AutoEats Agent MCP Server",
-        "dishes_count": len(get_all_dishes()),
-        "restaurants_count": len(get_all_restaurants())
+# --- WebSocket for LLM / Agent interactions ---
+@app.websocket("/mcp")
+async def websocket_endpoint(ws: WebSocket):
+    """WebSocket that supports JSON-RPC 2.0 format.
+
+    JSON-RPC requests (with an "id") will receive JSON-RPC responses.
+    """
+    await ws.accept()
+    try:
+        while True:
+            data = await ws.receive_text()
+            try:
+                payload = json.loads(data)
+            except Exception:
+                # If incoming payload isn't valid JSON, return a small error and continue
+                await ws.send_text(json.dumps({"status": "error", "error": "invalid_json", "message": "Could not parse JSON"}))
+                continue
+
+            # JSON-RPC 2.0 handling
+            if isinstance(payload, dict) and payload.get("jsonrpc") == "2.0":
+                req_id = payload.get("id")
+                method = payload.get("method")
+                params = payload.get("params", {}) or {}
+
+                async def send_jsonrpc_result(result: Any):
+                    if req_id is not None:
+                        resp = {"jsonrpc": "2.0", "id": req_id, "result": result}
+                        await ws.send_text(json.dumps(resp))
+
+                async def send_jsonrpc_error(code: int, message: str, data: Any = None):
+                    if req_id is not None:
+                        err = {"code": code, "message": message}
+                        if data is not None:
+                            err["data"] = data
+                        resp = {"jsonrpc": "2.0", "id": req_id, "error": err}
+                        await ws.send_text(json.dumps(resp))
+
+                try:
+                    # Map JSON-RPC method names to implementation
+                    if method == "list_dishes":
+                        res = [d.model_dump() for d in get_all_dishes()]
+                        await send_jsonrpc_result(res)
+
+                    elif method == "get_dish":
+                        dish_id = params.get("dish_id")
+                        if not dish_id:
+                            await send_jsonrpc_error(-32602, "Invalid params", "dish_id required")
+                        else:
+                            dish = get_dish_by_id(dish_id)
+                            if not dish:
+                                await send_jsonrpc_error(-32004, "Dish not found")
+                            else:
+                                await send_jsonrpc_result(dish.model_dump())
+
+                    elif method == "search_dishes":
+                        res = search_dishes(
+                            dish_name=params.get("dish_name"),
+                            restaurant_id=params.get("restaurant_id"),
+                            tags=params.get("tags"),
+                            max_price=params.get("max_price"),
+                            min_popularity_score=params.get("min_popularity_score")
+                        )
+                        await send_jsonrpc_result([d.model_dump() for d in res])
+
+                    elif method == "list_restaurants":
+                        await send_jsonrpc_result(get_all_restaurants())
+
+                    elif method == "create_order":
+                        items = params.get("items")
+                        if not items:
+                            await send_jsonrpc_error(-32602, "Invalid params", "items required")
+                        else:
+                            try:
+                                order, delivery = create_order(items, user_id=params.get("user_id"), delivery_zip=params.get("delivery_zip"))
+                                await send_jsonrpc_result({"order": order.model_dump(), "delivery": delivery.model_dump()})
+                            except ValueError as e:
+                                await send_jsonrpc_error(-32002, "Bad request", str(e))
+
+                    elif method == "get_order":
+                        order_id = params.get("order_id")
+                        if not order_id:
+                            await send_jsonrpc_error(-32602, "Invalid params", "order_id required")
+                        else:
+                            order = get_order(order_id)
+                            if not order:
+                                await send_jsonrpc_error(-32004, "Order not found")
+                            else:
+                                await send_jsonrpc_result(order.model_dump())
+
+                    elif method == "get_delivery":
+                        order_id = params.get("order_id")
+                        if not order_id:
+                            await send_jsonrpc_error(-32602, "Invalid params", "order_id required")
+                        else:
+                            d = get_delivery_info(order_id)
+                            if not d:
+                                await send_jsonrpc_error(-32004, "Delivery not found")
+                            else:
+                                await send_jsonrpc_result(d.model_dump())
+
+                    elif method == "update_order_status":
+                        order_id = params.get("order_id")
+                        status_str = params.get("status")
+                        if not order_id or not status_str:
+                            await send_jsonrpc_error(-32602, "Invalid params", "order_id and status required")
+                        else:
+                            try:
+                                new_status = OrderStatus(status_str)
+                                order = update_order_status(order_id, new_status)
+                                await send_jsonrpc_result(order.model_dump())
+                            except ValueError as e:
+                                await send_jsonrpc_error(-32004, "Not found", str(e))
+
+                    elif method == "manifest":
+                        # Return manifest as a convenience
+                        manifest = {
+                            "name": "AutoEats Agent MCP",
+                            "description": "MCP for automated food ordering",
+                            "endpoints": {
+                                "list_dishes": "/dishes",
+                                "search_dishes": "/dishes/search",
+                                "create_order": "/orders",
+                                "get_order": "/orders/{order_id}",
+                                "get_delivery": "/deliveries/{order_id}",
+                                "websocket": "/mcp",
+                                "ws_protocol": "json-rpc-2.0"
+                            }
+                        }
+                        await send_jsonrpc_result(manifest)
+
+                    else:
+                        await send_jsonrpc_error(-32601, "Method not found")
+
+                except WebSocketDisconnect:
+                    raise
+                except Exception as e:
+                    # Internal error
+                    await send_jsonrpc_error(-32000, "Internal error", str(e))
+
+
+    except WebSocketDisconnect:
+        # Client disconnected
+        return
+
+
+# --- MCP manifest HTTP endpoint ---
+@app.get("/mcp/manifest")
+async def get_mcp_manifest():
+    base = {
+        "name": "AutoEats Agent MCP Server",
+        "description": "MCP server for automated food ordering (POC)",
+        "tools": {
+            "list_dishes": {
+                "method": "GET",
+                "path": "/dishes",
+                "description": "List all dishes",
+                "params": {
+                    "query": {
+                        "limit": {"type": "integer", "required": False, "description": "Optional max number of results"}
+                    }
+                }
+            },
+            "get_dish": {
+                "method": "GET",
+                "path": "/dishes/{dish_id}",
+                "description": "Get dish details",
+                "params": {
+                    "path": {
+                        "dish_id": {"type": "string", "required": True, "description": "ID of the dish"}
+                    }
+                }
+            },
+            "search_dishes": {
+                "method": "POST",
+                "path": "/dishes/search",
+                "description": "Search dishes by criteria",
+                "params": {
+                    "body": {
+                        "dish_name": {"type": "string", "required": False},
+                        "restaurant_id": {"type": "string", "required": False},
+                        "tags": {"type": "array[string]", "required": False},
+                        "max_price": {"type": "number", "required": False},
+                        "min_popularity_score": {"type": "number", "required": False}
+                    }
+                }
+            },
+            "list_restaurants": {
+                "method": "GET",
+                "path": "/restaurants",
+                "description": "List restaurants",
+                "params": {"query": {} }
+            },
+            "create_order": {
+                "method": "POST",
+                "path": "/orders",
+                "description": "Create a new order",
+                "params": {
+                    "body": {
+                        "items": {"type": "array[object]", "required": True, "description": "List of items [{dish_id, quantity}]"},
+                        "user_id": {"type": "string", "required": False},
+                        "delivery_zip": {"type": "string", "required": False}
+                    }
+                }
+            },
+            "get_order": {
+                "method": "GET",
+                "path": "/orders/{order_id}",
+                "description": "Fetch order by id",
+                "params": {
+                    "path": {
+                        "order_id": {"type": "string", "required": True}
+                    }
+                }
+            },
+            "get_delivery": {
+                "method": "GET",
+                "path": "/deliveries/{order_id}",
+                "description": "Fetch delivery info",
+                "params": {
+                    "path": {
+                        "order_id": {"type": "string", "required": True}
+                    }
+                }
+            },
+            "websocket": {
+                "method": "WS",
+                "path": "/mcp",
+                "description": "WebSocket control channel for agents",
+                "params": {
+                    "message": {
+                        "action": {"type": "string", "required": True, "description": "Action name (e.g., search_dishes, create_order)"},
+                        "params": {"type": "object", "required": False, "description": "Action-specific parameters"}
+                    }
+                }
+            }
+        }
     }
+    return MCPManifest(**base)
+
+
 
